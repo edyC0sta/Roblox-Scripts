@@ -5,7 +5,7 @@ local zombies = {}
 local remote = game:GetService("ReplicatedStorage").Remotes.GunRemotes.GunHit
 local hrp = char.HumanoidRootPart
 
-hrp.CFrame = CFrame.new(642,2162,300)
+hrp.CFrame = CFrame.new(596,2162,300)
 
 local function processZombie(zombie)
     local num = tonumber(zombie.Name:sub(8))
@@ -38,13 +38,18 @@ while task.wait(0.1) do
         end
 
         for _, zombieNum in zombies do
-        local zombieName = "Zombie_" .. tostring(zombieNum)
-        local zombieCframe = zombieDirectory:FindFirstChild(zombieName).HumanoidRootPart.CFrame.Position
-            remote:FireServer(
-                toolName,
-                zombieNum,
-                zombieCframe
-            )
+            local zombieName = "Zombie_" .. tostring(zombieNum)
+            local zombieModel = zombieDirectory:WaitForChild(zombieName)
+            
+            if zombieModel then
+                local zombiePos = zombieModel:WaitForChild("HumanoidRootPart").CFrame.Position
+                    remote:FireServer(
+                        toolName,
+                        zombieNum,
+                        zombiePos
+                    )
+            else continue
+            end
         end
     end
 end
