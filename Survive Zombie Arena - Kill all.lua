@@ -39,7 +39,7 @@ while task.wait(0.1) do
 
         for _, zombieNum in zombies do
             local zombieName = "Zombie_" .. tostring(zombieNum)
-            local zombieModel = zombieDirectory:WaitForChild(zombieName)
+            local zombieModel = zombieDirectory:FindFirstChild(zombieName)
             
             if zombieModel then
                 local zombiePos = zombieModel:WaitForChild("HumanoidRootPart").CFrame.Position
