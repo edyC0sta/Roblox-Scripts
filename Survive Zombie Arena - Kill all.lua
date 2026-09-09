@@ -3,9 +3,6 @@ local char = player.Character
 local zombieDirectory = game.Workspace.Zombies_Local
 local zombies = {}
 local remote = game:GetService("ReplicatedStorage").Remotes.GunRemotes.GunHit
-local hrp = char.HumanoidRootPart
-
-hrp.CFrame = CFrame.new(596,2162,300)
 
 local function processZombie(zombie)
     local num = tonumber(zombie.Name:sub(8))
