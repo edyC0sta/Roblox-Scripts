@@ -1,70 +1,42 @@
-local loot = {}
-local playerHrp = game:GetService("Players").LocalPlayer.Character.HumanoidRootPart
-local dropdown
+local Loot = {}
+local Player = game:GetService("Players").LocalPlayer.Character
+local PlayerHrp = Player.HumanoidRootPart
+local Dropdown
 local Event = game:GetService("ReplicatedStorage").FlowClient.ClientRunner.Event
 
 local ESPLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/mstudio45/MSESP/refs/heads/main/source.luau"))()
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
 
---Ammo Remote hook
-getgenv().InfiniteAmmo = false
-local ammoHook
-ammoHook = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
-    if getgenv().InfiniteAmmo and (method == "GetAttribute") then
-        local attributeName = args[1]
-        if attributeName == "Ammo" then
-            return 999
-        end
-    end
-    return ammoHook(self, ...)
-end)
---
-
 --Damage Remote Hook (for the One Tap)
 getgenv().OneTap = false
-local oneTapHook
-oneTapHook = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}  
-    if getgenv().OneTap and
-       self == Event and
-       method == "FireServer" then
-        if args[2] == "Damage" then
-            args[4] = 9999
-            return oneTapHook(self, unpack(args))
-        end
+local OneTapHook
+OneTapHook = hookmetamethod(game, "__namecall", newcclosure(function(Self, arg1, arg2, arg3, damage, ...)
+    local Method = getnamecallmethod()
+    if OneTap and
+       Self == Event and
+       Method == "FireServer" and
+       typeof(arg1) == "string" and
+       typeof(arg2) == "string" and arg2 == "Damage" and
+       typeof(arg3) == "Instance" and
+       typeof(damage) == "number" then
+        return OneTapHook(Self, arg1, arg2, arg3, 9999, ...)
     end
-    return oneTapHook(self, ...)
-end)
+    return OneTapHook(Self, arg1, arg2, arg3, damage, ...)
+end))
 --
 
---Infinite Fuel Value hook
-getgenv().InfiniteFuel = false
-local gas = workspace.Vehicles.Claptima.gasLevel
-local infiniteFuelHook
-infiniteFuelHook = hookmetamethod(game, "__index", function(self,v)
-    if getgenv().InfiniteFuel and
-       self == gas and 
-       v == "Value" then
-        return 50
-    end
-    return infiniteFuelHook(self, v)
-end)
-
 --ESP
-local function partAdded(part)    
-    if not part:IsA("Model") then return end
+local function partAdded(Part)    
+    if not Part:IsA("Model") then return end
     
-    if (part.Name == "Safe" or 
-       part.Name == "ATM" or
-       part.Name == "Vault") and 
-       part.Health.Value >= 0 then
+    if (Part.Name == "Safe" or 
+       Part.Name == "ATM" or
+       Part.Name == "Vault") and 
+       Part.Health.Value >= 0 then
         local PartColor = Color3.fromRGB(100, 255, 100)
-        local partESP = ESPLibrary:Add({
-            Name = part.Name,
-            Model = part,
+        local PartESP = ESPLibrary:Add({
+            Name = Part.Name,
+            Model = Part,
 
             Color = PartColor,
             MaxDistance = 10000,
@@ -75,263 +47,299 @@ local function partAdded(part)
             OutlineColor = PartColor,
         })
 
-        local partHealth = part.Health
-        partHealth.Changed:Connect(function(newvalue)
-            if newvalue <= 0 then
-                print("No health")
-                partESP:Destroy()
+        local PartHealth = Part.Health
+        PartHealth.Changed:Connect(function(NewValue)
+            if NewValue <= 0 then
+                PartESP:Destroy()
             end
         end)
     end
 end
 
-local function ESP(bool)
-    if bool then
-        local buildings = game.Workspace.Map.Buildings
-        local buldingsDescendants = buildings:GetDescendants()
+local function ESP(Enabled)
+    if not Enabled then ESPLibrary:Clear() end
+    
+    local Buildings = game.Workspace.Map.Buildings
+    local BuldingsDescendants = Buildings:GetDescendants()
 
-        for _,descendant in buldingsDescendants do
-            partAdded(descendant)
-        end
-
-        buildings.DescendantAdded:Connect(function(descendant)
-            partAdded(descendant)
-        end)
-    else ESPLibrary:Clear()
+    for _,Descendant in BuldingsDescendants do
+        partAdded(Descendant)
     end
+
+    Buildings.DescendantAdded:Connect(function(Descendant)
+        partAdded(Descendant)
+    end)
 end
 --
 
 --Loot TP
-local function pickupEvent(tool)
+local function PickupEvent(Tool)
     local Event = game:GetService("ReplicatedStorage").FlowClient.ClientRunner.Function
     Event:InvokeServer(
         "Loot",
         "LootEquip",
-        tool.Handle
+        Tool.Handle
     )
 end
 
-local function pickupItemAndReturntoPos(selectedItem)
-    if not selectedItem then return end
+local function pickupItemAndReturntoPos(SelectedItem)
+    if not SelectedItem then return end
 
-    local lootLoc = game.Workspace.Loot
-    local item = lootLoc:FindFirstChild(selectedItem)
-    if item then
-        local itemPos = item.Handle.CFrame.Position
-        local playerPos = playerHrp.CFrame.Position
-        playerHrp.CFrame = CFrame.new(itemPos)
-        task.wait(0.2)
-        pickupEvent(item)
-        task.wait(0.8)
-        playerHrp.CFrame = CFrame.new(playerPos)
+    local LootLoc = game.Workspace.Loot
+    local Item = LootLoc:FindFirstChild(SelectedItem)
+    if Item then
+        local ItemPos = Item.Handle.CFrame.Position
+        local PlayerPos = PlayerHrp.CFrame.Position
+        PlayerHrp.CFrame = CFrame.new(ItemPos)
+        task.wait(0.5)
+        PickupEvent(Item)
+        task.wait(1)
+        PlayerHrp.CFrame = CFrame.new(PlayerPos)
      end
 end
 
-local function lootTP()
-    local lootLoc = game.Workspace.Loot
-    loot = lootLoc:GetChildren()
+local function LootTP()
+    local LootLoc = game.Workspace.Loot
+    Loot = LootLoc:GetChildren()
 
-    for i,item in loot do
-        if item.Name == "Coin" then -- bugs your player
-            table.remove(loot, i)
+    for i,Item in Loot do
+        if Item.Name == "Coin" then -- bugs your player
+            table.remove(Loot, i)
         end
-        loot[i] = item.Name
+        Loot[i] = Item.Name
     end
 
-    lootLoc.ChildRemoved:Connect(function(item)
-        dropdown:Set({})
-        local index = table.find(loot,item.Name)
-        table.remove(loot, index)
-        dropdown:Refresh(loot)
+    LootLoc.ChildRemoved:Connect(function(Item)
+        Dropdown:Set({})
+        local Index = table.find(Loot,Item.Name)
+        table.remove(Loot, Index)
+        Dropdown:Refresh(Loot)
     end)
 
-    lootLoc.ChildAdded:Connect(function(item)
-        if item.Name == "Coin" then return end -- bugs your player
-        dropdown:Set({})
-        table.insert(loot, item.Name)
-        dropdown:Refresh(loot)
+    LootLoc.ChildAdded:Connect(function(Item)
+        if Item.Name == "Coin" then return end -- bugs your player
+        Dropdown:Set({})
+        table.insert(Loot, Item.Name)
+        Dropdown:Refresh(Loot)
     end)
 
-    return loot
+    return Loot
 end
 --
 
 
 --Kill Aura
-local function npcsInRange(npcs, plrPos, maxDistance)
-    local distance
+local function NpcsInRange(Npcs, PlrPos, MaxDistance)
+    local Distance
     local NpcsInDinstance = {}
 
-    for _,npc in pairs(npcs) do
-        local npcPos = npc.HumanoidRootPart.CFrame.Position
-        distance = (plrPos - npcPos).magnitude
+    for _,Npc in Npcs do
+        if Npc:WaitForChild("Humanoid").Health <= 0 then continue end
+        local NpcHrp = Npc:FindFirstChild("HumanoidRootPart")
+        local NpcPos
+        if NpcHrp then
+            NpcPos = NpcHrp.CFrame.Position
+        else continue end
 
-        if distance <= maxDistance then
-            table.insert(NpcsInDinstance, npc)
+        Distance = (PlrPos - NpcPos).magnitude
+
+        if Distance <= MaxDistance then
+            table.insert(NpcsInDinstance, Npc)
         end
     end
 
     return NpcsInDinstance
 end
 
-local function DamageNPCsEvent(npcs)
-    for _ , npc in pairs(npcs) do
+local function DamageNPCsEvent(Npcs)
+    for _ , Npc in Npcs do
         local Event = game:GetService("ReplicatedStorage").FlowClient.ClientRunner.Event
         Event:FireServer(
             "NPCs",
             "Damage",
-            npc.Humanoid,
+            Npc:WaitForChild("Humanoid"),
             1000
         )
     end
 end
 
-local function killaura(bool, maxDistance)
-    if bool then
-        local NPCSLocation = game.Workspace.NPCs
-        local NPCS = NPCSLocation:GetChildren()
-        local plrPos = playerHrp.CFrame.Position
-        local goodNPCS = npcsInRange(NPCS, plrPos, maxDistance)
+local function killaura(MaxDistance)
+    if not KillAuraStatus then return end
 
-        DamageNPCsEvent(goodNPCS)
+    local NPCSLocation = game.Workspace.NPCs
+    local NPCS = NPCSLocation:GetChildren()
+    local GoodNPCS
 
-        NPCSLocation.ChildRemoved:Connect(function(npc)
-            for _,v in pairs(goodNPCS) do
-                if npc == v then
-                    table.remove(goodNPCS,v)
-                end
+    NPCSLocation.ChildAdded:Connect(function(Npc)
+        table.insert(NPCS, Npc)
+    end)
+
+    NPCSLocation.ChildRemoved:Connect(function(Npc)
+        if GoodNPCS then
+            local Index1 = table.find(GoodNPCS, Npc)
+            if Index1 then
+                table.remove(GoodNPCS, Index1)
             end
-        end)
+        end
+
+        if NPCS then
+            local Index2 = table.find(NPCS, Npc)
+            if Index2 then
+                table.remove(NPCS, Index2)
+            end
+        end
+    end)
+
+    while KillAuraStatus do
+        task.wait(0.1)
+        local PlrPos = PlayerHrp.CFrame.Position
+        GoodNPCS = NpcsInRange(NPCS, PlrPos, MaxDistance)
+        DamageNPCsEvent(GoodNPCS)
     end
 end
 --
 
 --One Tap
-local function oneTap(bool)
-    getgenv().OneTap = bool
+local function oneTap(BoolValue)
+    OneTap = BoolValue
 end
 --
 
 --Infinite Ammo
-local function infiniteAmmo(bool)
-    getgenv().InfiniteAmmo = bool
+local function InfiniteAmmo()
+    Player.ChildAdded:Connect(function(Child)
+        if not Child:isA("Tool") then return end
+        local Tool = Child
+
+        Tool.AttributeChanged:Connect(function(Attribute)
+            if Attribute == "Ammo" then
+                Tool:SetAttribute("Ammo", 999)
+            end
+        end)
+    end)
 end
 --
 
 -- "Infinite Fuel"
-local function infiniteFuel(bool)
-    getgenv().InfiniteFuel = bool
+local function InfiniteFuel(Vehicle)
+    local Fuel = Vehicle.gasLevel
+
+    Fuel.Changed:Connect(function()
+        Fuel.Value = 50
+    end)
 end
 --
 
 --Vehicle Mods
-local function vehicleMods(mod, value)
-    local vehicle = game.Workspace.Vehicles:FindFirstChildOfClass("Model").VehicleProperty
+local function VehicleMods(Mod, Value, Vehicle)
 
-    if mod == "Acceleration" then
-    vehicle:SetAttribute("Acceleration", value)
+    if Mod == "Acceleration" then
+    Vehicle.VehicleProperty:SetAttribute("Acceleration", Value)
     else
-    vehicle:SetAttribute("TopSpeedMPH", value)
+    Vehicle.VehicleProperty:SetAttribute("TopSpeedMPH", Value)
     end
 end
 
-local function setupUI()
-    local window = Rayfield:CreateWindow({
+local function SetupUI()
+    local Window = Rayfield:CreateWindow({
         name = "RunAways Scripts",
         subtitle = "Made by Edy_Synner",
         sidebarLayout = true,
     })
 
-    local itemsAndesp = window:CreateTab({ name = "Items & ESP", icon = 127234874352422 })
-    local combat = window:CreateTab({ name = "Combat", icon = 101060850237115 })
-    local carMods = window:CreateTab({ name = "Car Mods", icon = 91451724283877 })
+    local ItemsAndesp = Window:CreateTab({ name = "Items & ESP", icon = 127234874352422 })
+    local Combat = Window:CreateTab({ name = "Combat", icon = 101060850237115 })
+    local CarMods = Window:CreateTab({ name = "Car Mods", icon = 91451724283877 })
 
-    dropdown = itemsAndesp:CreateDropdown({
+    Dropdown = ItemsAndesp:CreateDropdown({
         name = "Items",
         description = "Select the Items to pick Up",
         multiSelect = false,
-        options = loot,
+        options = Loot,
         callback = function(selected)
             pickupItemAndReturntoPos(selected)
-            dropdown:Refresh(loot)
+            Dropdown:Refresh(Loot)
         end,
     })
 
-    itemsAndesp:CreateToggle({
+    ItemsAndesp:CreateToggle({
     name = "ESP",
     description = "ESP on ATMs, Safes and Vaults",
     value = false,
-    callback = function(value)
-        ESP(value)
+    callback = function(Enabled)
+        ESP(Enabled)
     end,
     })
     
-    local maxDistance
-    combat:CreateInput({
+    local MaxDistance
+    Combat:CreateInput({
     name = "Kill aura Distance",
     numeric = true,
     placeholder = "Enter a number",
-    callback = function(distance)
-        maxDistance = distance
+    callback = function(Distance)
+        MaxDistance = Distance
     end,
     })
 
-    combat:CreateToggle({
+    getgenv().KillAuraStatus = false
+    Combat:CreateToggle({
     name = "Kill aura",
     description = "Will kill all npcs on the said distance",
-    callback = function(value)
-        killaura(value, tonumber(maxDistance))
+    callback = function(BoolValue)
+        KillAuraStatus = BoolValue
+        killaura(tonumber(MaxDistance))
     end,
     })
 
-    combat:CreateToggle({
+    Combat:CreateToggle({
     name = "One Tap",
     description = "This is make it so you can one tap things that can be damaged (npcs, cars, atms...)",
-    callback = function(value)
-        oneTap(value)
+    callback = function(BoolValue)
+        oneTap(BoolValue)
     end,
     })
 
-    combat:CreateToggle({
+    Combat:CreateButton({
     name = "Infinite Ammo",
     description = "Give you infinite ammo on any gun",
-    callback = function(value)
-        infiniteAmmo(value)
+    callback = function()
+        InfiniteAmmo()
     end,
     })
 
-    carMods:CreateToggle({
+    local Vehicle = game.Workspace.Vehicles:FindFirstChildOfClass("Model")
+
+    CarMods:CreateButton({
     name = "Infinite Fuel",
     description = "Makes it so you can drive the car even when it doesn't have fuel",
     value = false,
-    callback = function(value)
-        infiniteFuel(value)
+    callback = function()
+        InfiniteFuel(Vehicle)
     end,
     })
 
-    carMods:CreateInput({
+    CarMods:CreateInput({
     name = "Acceleration",
     description = "Allows you to change the vehicle acceleration",
     numeric = true,
     placeholder = "Enter a number",
-    callback = function(number)
-        vehicleMods("Acceleration", number)
+    callback = function(Number)
+        VehicleMods("Acceleration", Number, Vehicle)
     end,
     })
 
-    carMods:CreateInput({
+    CarMods:CreateInput({
     name = "Top Speed",
     description = "Allows you to change the vehicle top speed",
     numeric = true,
     placeholder = "Enter a number",
-    callback = function(number)
-        vehicleMods("TopSpeedMPH", number)
+    callback = function(Number)
+        VehicleMods("TopSpeedMPH", Number, Vehicle)
     end,
     })
     
 end
 
 
-loot = lootTP()
-setupUI()
+Loot = LootTP()
+SetupUI()
